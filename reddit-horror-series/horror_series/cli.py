@@ -1,6 +1,7 @@
 """Command line interface.
 
   python -m horror_series scrape --time year --limit 200         # Reddit -> data/stories.json
+  python -m horror_series scrape --source rss                     # force a specific source
   python -m horror_series build  --top 5 [--llm]                 # stories -> output/<series>/
   python -m horror_series run    --time all --top 5 [--llm]      # both in one go
 """
@@ -20,6 +21,8 @@ def _add_scrape_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--subreddits", nargs="+", default=DEFAULT_SUBREDDITS)
     p.add_argument("--time", default="all", choices=["hour", "day", "week", "month", "year", "all"])
     p.add_argument("--limit", type=int, default=200, help="posts to fetch per subreddit (max ~1000)")
+    p.add_argument("--source", default="auto", choices=["auto", "reddit-api", "arctic", "rss"],
+                   help="auto = official API if REDDIT_CLIENT_ID is set, else Arctic Shift, else RSS")
     p.add_argument("--stories", type=Path, default=Path("data/stories.json"))
 
 
@@ -37,7 +40,7 @@ def _add_build_args(p: argparse.ArgumentParser) -> None:
 
 
 def cmd_scrape(args) -> int:
-    stories = scrape(args.subreddits, args.time, args.limit)
+    stories = scrape(args.subreddits, args.time, args.limit, args.source)
     save_stories(stories, args.stories)
     print(f"saved {len(stories)} stories -> {args.stories}")
     return 0 if stories else 1

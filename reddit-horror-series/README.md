@@ -42,7 +42,21 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Reddit increasingly blocks anonymous JSON requests. If `scrape` returns 403/429, create a free "script" app at <https://www.reddit.com/prefs/apps> and export:
+### Getting data out of Reddit (2026)
+
+Reddit has locked down scraping:
+- **Unauthenticated `.json` URLs return 403.** Reddit started blocking them in late May 2026.
+- **New API keys need manual approval.** This started in November 2025 under Reddit's Responsible Builder Policy, and personal projects are often rejected.
+
+So `scrape` supports three sources. `--source auto`, the default, tries them in this order:
+
+| Source | Needs | Pros | Cons |
+|---|---|---|---|
+| `reddit-api` | An **approved** app: `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | Real "top" ranking, live scores | Hard to get approved |
+| `arctic` (default) | Nothing | [Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift) is a free Reddit archive with no key. It has full post text and final scores, and can reach all-time top posts | No "top" sort, so the tool scans post metadata and ranks by score itself. `--time all` on r/nosleep takes a while |
+| `rss` | Nothing | Reddit's own `/top/.rss` feed, full post text | No scores, max ~100 posts per subreddit, ~1 request/min |
+
+If one source fails, `auto` moves on to the next. To use the official API, export:
 
 ```bash
 export REDDIT_CLIENT_ID=...
@@ -50,13 +64,21 @@ export REDDIT_CLIENT_SECRET=...
 export REDDIT_USER_AGENT="python:reddit-horror-series:0.1 (by /u/<your reddit name>)"
 ```
 
+If none of the sources can be reached from your network, open the [Arctic Shift download tool](https://arctic-shift.photon-reddit.com/download-tool) in a browser. Download a subreddit's posts as `.jsonl` and run `python -m horror_series build --stories r_nosleep_posts.jsonl`.
+
 For `--llm` you also need `ANTHROPIC_API_KEY`.
 
 ## Usage
 
 ```bash
-# 1. Download the top posts of all time (200 per subreddit)
+# 1. Download the top posts of the last year (200 per subreddit) - Arctic Shift, no key needed
+python -m horror_series scrape --time year --limit 200
+
+# All-time top (scans each subreddit's full history on Arctic Shift, slower)
 python -m horror_series scrape --time all --limit 200
+
+# Quick sample from Reddit's own RSS feed
+python -m horror_series scrape --source rss --subreddits nosleep
 
 # 2. Rank them and write the 5 best as 10-part Shorts series
 python -m horror_series build --top 5
@@ -68,9 +90,9 @@ python -m horror_series build --top 5 --llm
 python -m horror_series run --time year --preset long --top 3
 ```
 
-Useful flags: `--parts 10`, `--preset shorts|long`, `--wpm 160` (narration speed), `--no-nsfw`, `--subreddits nosleep LetsNotMeet`, `-v` (explains why stories were skipped).
+Useful flags: `--source auto|arctic|rss|reddit-api`, `--parts 10`, `--preset shorts|long`, `--wpm 160` (narration speed), `--no-nsfw`, `--subreddits nosleep LetsNotMeet`, `-v` (explains why stories were skipped).
 
-`build --stories` also accepts a raw Reddit listing JSON. For example, save `https://www.reddit.com/r/nosleep/top.json?t=all&limit=100` in your browser and pass that file.
+`build --stories` also accepts an Arctic Shift `.jsonl` download or a raw Reddit listing JSON.
 
 | Preset | Story narration per part | Total story length that fits |
 |---|---|---|
